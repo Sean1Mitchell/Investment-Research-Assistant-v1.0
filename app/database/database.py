@@ -11,6 +11,7 @@ class Company(Base):
     name = Column(String)
     incorporation_date = Column(String)
     registered_address = Column(String)
+    investor_relations_url = Column(String)
 
     filings = relationship("Filing", back_populates="company")
 

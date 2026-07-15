@@ -27,3 +27,23 @@ No production code has been written yet.
 - Determine Python frameworks and libraries.
 - Create initial project structure.
 - Begin development of core functionality.
+
+**15 July 2026 - Core Data Pipeline Built**
+**Completed**
+- Set up Python project environment (venv, SQLAlchemy, requests, python-dotenv).
+- Integrated Companies House API: fetches company profile data (name, incorporation date, registered address) and stores it in a structured SQLite database.
+- Added filing history tracking: pulls each company's full accounts filing history from Companies House, with duplicate-safe storage (re-running is safe, no repeated entries).
+- Confirmed working end-to-end on two real companies: Tesco PLC and J Sainsbury PLC.
+- Investigated Companies House document formats for large companies: confirmed their filed accounts are scanned/image-based PDFs with no extractable text, across multiple filing years — ruled out as a source for financial figures.
+- Tested three third-party financial data APIs (Finnhub, Alpha Vantage, Financial Modeling Prep) for UK company fundamentals: confirmed none provide usable UK financial statement data within a sustainable free or low-cost budget.
+- Built and tested a company-agnostic "annual report discovery" function: automatically finds each company's current annual report PDF directly from their own investor relations website, using Playwright to handle JavaScript-rendered pages.
+- Confirmed this discovery function works correctly on two companies with entirely different website structures and file-naming conventions (Tesco, Sainsbury's), with no company-specific code required.
+- Confirmed both companies' investor relations annual reports are genuine text-based PDFs (unlike Companies House's versions), verified via direct text extraction.
+- Added `investor_relations_url` field to the company database schema; stored working URLs for both tracked companies.
+- Established project hygiene: `.env` for secrets (git-ignored), `.gitignore` covering environment, virtual environment, and database files, and a `scratch/` folder convention for disposable test scripts.
+**Current Status**
+Core data ingestion pipeline is functional: company profile data, filing history, and current annual report discovery all work end-to-end, for free, without reliance on paid data providers.
+**Next Steps**
+- Build figure-extraction logic to pull actual financial statement line items (revenue, profit, etc.) from the extracted annual report text.
+- Wire filing-history checks to automatically trigger a fresh annual report lookup when a new filing is detected.
+- Design "isolation" vs "trend" display views once real financial figures are being captured.
