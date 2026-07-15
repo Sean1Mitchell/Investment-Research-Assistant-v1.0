@@ -47,3 +47,18 @@ Core data ingestion pipeline is functional: company profile data, filing history
 - Build figure-extraction logic to pull actual financial statement line items (revenue, profit, etc.) from the extracted annual report text.
 - Wire filing-history checks to automatically trigger a fresh annual report lookup when a new filing is detected.
 - Design "isolation" vs "trend" display views once real financial figures are being captured.
+
+**16 July 2026 - Income Statement Figure Extraction**
+**Completed**
+- Located exact page numbers for financial statements within both companies' annual reports, using each report's own table of contents.
+- Built and verified a text-parsing function that extracts key income statement figures (revenue, cost of sales, gross profit, operating profit, profit before tax, taxation, profit for the year) directly from extracted PDF text.
+- Identified and fixed a genuine wording mismatch between companies (e.g. "Taxation" vs "Income tax (expense)/credit"), moving from exact-phrase matching to flexible keyword-based matching.
+- Identified and fixed a genuine formatting mismatch between companies (different dash characters used to represent zero values).
+- Verified all extracted figures manually against the source PDF text for both Tesco and Sainsbury's — full agreement on all seven line items, both companies.
+- Moved the finished, tested parser into `app/financial_data/income_statement_parser.py` as permanent project code.
+**Current Status**
+Core figure-extraction proven working and verified on two real companies with differing report structures and terminology.
+**Next Steps**
+- Automate page discovery for the income statement (currently requires manually finding the page number per company via the table of contents).
+- Extend parsing to the balance sheet and cash flow statement.
+- Wire extracted figures into the database, alongside company and filing records.
