@@ -5,9 +5,6 @@ from database import Company, FinancialFigure, engine
 from income_statement_parser import parse_income_statement
 from sqlalchemy.orm import sessionmaker
 
-# Map each company to its downloaded report file.
-# (Once download automation is built, this will come from the discovery
-# pipeline directly rather than a hardcoded path.)
 COMPANY_REPORTS = {
     "TESCO PLC": "scratch/TESCO_PLC_report.pdf",
     "J SAINSBURY PLC": "scratch/J_SAINSBURY_PLC_report.pdf",
@@ -15,6 +12,7 @@ COMPANY_REPORTS = {
 
 def store_financials_for_company(session, company, filepath):
     figures = parse_income_statement(filepath)
+    consistency = figures.pop("_consistency_check", {"consistent": False})
     retrieved_at = datetime.utcnow().isoformat()
 
     for line_item, values in figures.items():
@@ -34,11 +32,15 @@ def store_financials_for_company(session, company, filepath):
             this_year_value=values["this_year_total"],
             last_year_value=values["last_year_total"],
             source_document=filepath,
-            retrieved_at=retrieved_at
+            retrieved_at=retrieved_at,
+            passed_consistency_check=consistency.get("consistent", False),
+            verified=False
         )
         session.add(figure)
         session.commit()
-        print(f"  Saved {line_item}: {values}")
+
+        flag = "✓ consistency check passed" if consistency.get("consistent") else "⚠ FAILED consistency check — needs manual review"
+        print(f"  Saved {line_item}: {values} [{flag}]")
 
 if __name__ == "__main__":
     Session = sessionmaker(bind=engine)
@@ -49,6 +51,5 @@ if __name__ == "__main__":
         if not company:
             print(f"{company_name} not found in database, skipping")
             continue
-
         print(f"\n{company_name}")
         store_financials_for_company(session, company, filepath)

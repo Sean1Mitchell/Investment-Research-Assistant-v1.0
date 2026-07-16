@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -35,11 +35,13 @@ class FinancialFigure(Base):
 
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey("companies.id"))
-    line_item = Column(String)       # e.g. "revenue", "operating_profit"
+    line_item = Column(String)
     this_year_value = Column(Integer)
     last_year_value = Column(Integer)
-    source_document = Column(String) # which report this came from
-    retrieved_at = Column(String)    # when we extracted it
+    source_document = Column(String)
+    retrieved_at = Column(String)
+    passed_consistency_check = Column(Boolean, default=False)
+    verified = Column(Boolean, default=False)
 
     company = relationship("Company", back_populates="financials")
 

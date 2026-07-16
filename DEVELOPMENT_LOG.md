@@ -77,3 +77,16 @@ Full pipeline now works end-to-end and unattended for a company's income stateme
 - Extend the same discovery-and-parsing approach to the balance sheet and cash flow statement.
 - Wire the whole chain (Companies House filing trigger → discovery → download → parse → store) into a single automated update process per company.
 - Begin designing the "isolation vs trend" display views using this now-real stored data.
+
+**17 July 2026 (cont.) - Reliability Layer: Consistency Checks and Verification Tracking**
+**Completed**
+- Identified a real flaw in a naive sanity-check design: a fixed "revenue minus cost of sales equals gross profit" formula would incorrectly flag genuinely correct data for companies with additional deduction lines (e.g. Tesco's insurance-related expense lines).
+- Built a generalized consistency check that sums all lines between "Revenue" and "Gross profit" dynamically, rather than assuming a fixed formula — correctly validates both Tesco's and Sainsbury's income statements despite their differing structures.
+- Added `passed_consistency_check` and `verified` fields to the financial figures table, giving every stored figure an explicit, queryable trust status rather than relying on memory of which figures were manually checked.
+- Re-ran extraction for both companies with the new checks in place; all fourteen figures passed the consistency check automatically.
+**Current Status**
+The pipeline now includes a self-checking reliability layer: extracted figures are automatically flagged as internally consistent or not, independent of manual verification, and every figure retains a separate, explicit "verified by me" status.
+**Next Steps**
+- Extend consistency checks to other statement sections as they're built (e.g. balance sheet: assets = liabilities + equity).
+- Extend parsing to the balance sheet and cash flow statement.
+- Design a simple way to review and mark figures as "verified" without needing to write a one-off script each time.
