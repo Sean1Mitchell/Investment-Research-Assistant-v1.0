@@ -62,3 +62,18 @@ Core figure-extraction proven working and verified on two real companies with di
 - Automate page discovery for the income statement (currently requires manually finding the page number per company via the table of contents).
 - Extend parsing to the balance sheet and cash flow statement.
 - Wire extracted figures into the database, alongside company and filing records.
+
+**17 July 2026 - Automatic Page Discovery and Persistent Storage**
+**Completed**
+- Built automatic income statement page discovery: locates the correct page in any company's annual report PDF by detecting the heading alongside key line-item labels together, distinguishing genuine statement pages from table-of-contents or cross-reference mentions.
+- Verified automatic discovery against both tracked companies, matching the previously manually-found page numbers exactly.
+- Removed the manual page-number requirement from the parser entirely — it is now fully automatic given just a PDF file.
+- Added a `financial_figures` database table, linked to each company, storing extracted line items with source document and retrieval timestamp for full traceability.
+- Built and ran a script that extracts and permanently stores income statement figures for both tracked companies, with duplicate-safe re-run behaviour.
+- Verified stored figures retrieve correctly and near-instantly from the database, without needing to re-parse the source PDF.
+**Current Status**
+Full pipeline now works end-to-end and unattended for a company's income statement: given a company already in the database with a stored investor relations URL, the system can find its current annual report, locate the income statement page, extract key figures, and store them permanently — all without manual intervention.
+**Next Steps**
+- Extend the same discovery-and-parsing approach to the balance sheet and cash flow statement.
+- Wire the whole chain (Companies House filing trigger → discovery → download → parse → store) into a single automated update process per company.
+- Begin designing the "isolation vs trend" display views using this now-real stored data.

@@ -14,6 +14,7 @@ class Company(Base):
     investor_relations_url = Column(String)
 
     filings = relationship("Filing", back_populates="company")
+    financials = relationship("FinancialFigure", back_populates="company")
 
 
 class Filing(Base):
@@ -27,6 +28,20 @@ class Filing(Base):
     document_url = Column(String)
 
     company = relationship("Company", back_populates="filings")
+
+
+class FinancialFigure(Base):
+    __tablename__ = "financial_figures"
+
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    line_item = Column(String)       # e.g. "revenue", "operating_profit"
+    this_year_value = Column(Integer)
+    last_year_value = Column(Integer)
+    source_document = Column(String) # which report this came from
+    retrieved_at = Column(String)    # when we extracted it
+
+    company = relationship("Company", back_populates="financials")
 
 
 engine = create_engine("sqlite:///research.db")

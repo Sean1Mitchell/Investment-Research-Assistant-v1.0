@@ -1,9 +1,6 @@
 import pdfplumber
 import re
 
-# Each entry: (required_all, required_any)
-# required_all: every keyword must be present in the line
-# required_any: at least one of these must be present (skipped if empty list)
 LINE_ITEM_RULES = {
     "revenue": (["revenue"], []),
     "cost_of_sales": (["cost of sales"], []),
@@ -38,15 +35,40 @@ def extract_numbers(line):
                 numbers.append(-value if negative else value)
     return numbers
 
-def parse_income_statement(filepath, page_index):
+def find_income_statement_page(filepath):
     """
-    Extracts key income statement line items from a given page of a PDF.
-    Returns a dict of {line_item: {"this_year_total": int, "last_year_total": int}}.
+    Scans the PDF to find the genuine income statement page, distinguishing
+    it from table-of-contents or cross-reference mentions by requiring the
+    heading AND several real line-item labels to appear together.
+    """
+    with pdfplumber.open(filepath) as pdf:
+        for i in range(len(pdf.pages)):
+            page = pdf.pages[i]
+            text = page.extract_text()
+            page.flush_cache()
 
-    Note: page_index must currently be found manually via the company's
-    table of contents (printed page number + 1). Automatic page discovery
-    is a planned improvement, not yet built.
+            if not text:
+                continue
+
+            lower = text.lower()
+            if ("income statement" in lower
+                    and "revenue" in lower
+                    and "cost of sales" in lower
+                    and "operating profit" in lower):
+                return i
+    return None
+
+def parse_income_statement(filepath, page_index=None):
     """
+    Extracts key income statement line items from a PDF.
+    If page_index is not supplied, automatically locates the correct page.
+    Returns a dict of {line_item: {"this_year_total": int, "last_year_total": int}}.
+    """
+    if page_index is None:
+        page_index = find_income_statement_page(filepath)
+        if page_index is None:
+            raise ValueError(f"Could not locate income statement page in {filepath}")
+
     with pdfplumber.open(filepath) as pdf:
         page = pdf.pages[page_index]
         text = page.extract_text()
