@@ -90,3 +90,17 @@ The pipeline now includes a self-checking reliability layer: extracted figures a
 - Extend consistency checks to other statement sections as they're built (e.g. balance sheet: assets = liabilities + equity).
 - Extend parsing to the balance sheet and cash flow statement.
 - Design a simple way to review and mark figures as "verified" without needing to write a one-off script each time.
+
+**17 July 2026 (cont.) - Schema Restructure for Multi-Year Support**
+**Completed**
+- Identified a structural limitation before it became a bigger problem: the original financial figures schema paired "this year" and "last year" values in fixed columns, which would not scale cleanly to storing many years of history per company.
+- Restructured the database so each row represents one line item, for one specific fiscal year-end date, for one company — enabling clean, unlimited historical depth without repeated schema changes.
+- Updated the income statement parser to extract each statement's real, stated period-end dates directly from the report text, rather than using generic "this year/last year" labels.
+- Migrated existing data to the new structure; verified no data was lost or duplicated in the process.
+- Updated the financial figures viewer to group and display results by fiscal year, confirming the new structure works correctly for real retrieval.
+**Current Status**
+The database can now cleanly support multiple years of financial data per company, per statement type, laying the groundwork for genuine year-over-year trend analysis once more historical reports are added.
+**Next Steps**
+- Extend parsing to the balance sheet and cash flow statement, using the same year-tagged approach.
+- Attach supporting disclosure/policy information to each statement year.
+- Pull and process multiple prior years' annual reports for both tracked companies.

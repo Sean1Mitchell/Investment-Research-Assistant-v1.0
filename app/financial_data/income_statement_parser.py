@@ -43,6 +43,14 @@ def extract_line_total(line):
         return numbers[-1]
     return None
 
+def extract_period_end_dates(lines):
+    date_pattern = re.compile(r"(\d{1,2} \w+ \d{4})")
+    for line in lines[:6]:
+        dates = date_pattern.findall(line)
+        if len(dates) == 2:
+            return dates[0], dates[1]
+    return None, None
+
 def find_income_statement_page(filepath):
     with pdfplumber.open(filepath) as pdf:
         for i in range(len(pdf.pages)):
@@ -60,13 +68,6 @@ def find_income_statement_page(filepath):
     return None
 
 def check_gross_profit_consistency(lines):
-    """
-    Sums every line between 'Revenue' and 'Gross profit' (inclusive of
-    revenue), and checks it against the stated gross profit total. This
-    generalizes across companies with different numbers of deduction lines
-    (e.g. Tesco's insurance-related lines vs Sainsbury's simpler structure),
-    rather than assuming a fixed revenue-minus-cost-of-sales formula.
-    """
     start_index = None
     end_index = None
     for i, line in enumerate(lines):
@@ -95,10 +96,18 @@ def check_gross_profit_consistency(lines):
 
 def parse_income_statement(filepath, page_index=None):
     """
-    Extracts key income statement line items from a PDF, and runs a
-    consistency check to flag whether the extraction looks internally sound.
-    Returns a dict of {line_item: {"this_year_total": int, "last_year_total": int}}
-    plus a "_consistency_check" entry with the check result.
+    Extracts key income statement line items from a PDF, tagged with their
+    real fiscal year-end dates, plus a consistency check result.
+
+    Returns:
+        {
+            "statement_type": "income_statement",
+            "consistency_check": {...},
+            "years": {
+                "<this_year_end_date>": {"revenue": 123, ...},
+                "<last_year_end_date>": {"revenue": 456, ...},
+            }
+        }
     """
     if page_index is None:
         page_index = find_income_statement_page(filepath)
@@ -110,7 +119,10 @@ def parse_income_statement(filepath, page_index=None):
         text = page.extract_text()
 
     lines = text.split("\n")
-    results = {}
+    this_year_end, last_year_end = extract_period_end_dates(lines)
+
+    this_year_figures = {}
+    last_year_figures = {}
 
     for key, (required_all, required_any) in LINE_ITEM_RULES.items():
         for line in lines:
@@ -118,10 +130,16 @@ def parse_income_statement(filepath, page_index=None):
                 numbers = extract_numbers(line)
                 if len(numbers) >= 6:
                     last_six = numbers[-6:]
-                    results[key] = {
-                        "this_year_total": last_six[2],
-                        "last_year_total": last_six[5]
-                    }
+                    this_year_figures[key] = last_six[2]
+                    last_year_figures[key] = last_six[5]
 
-    results["_consistency_check"] = check_gross_profit_consistency(lines)
-    return results
+    consistency = check_gross_profit_consistency(lines)
+
+    return {
+        "statement_type": "income_statement",
+        "consistency_check": consistency,
+        "years": {
+            this_year_end: this_year_figures,
+            last_year_end: last_year_figures,
+        }
+    }

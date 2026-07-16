@@ -11,36 +11,45 @@ COMPANY_REPORTS = {
 }
 
 def store_financials_for_company(session, company, filepath):
-    figures = parse_income_statement(filepath)
-    consistency = figures.pop("_consistency_check", {"consistent": False})
+    result = parse_income_statement(filepath)
+    statement_type = result["statement_type"]
+    consistent = result["consistency_check"].get("consistent", False)
     retrieved_at = datetime.utcnow().isoformat()
 
-    for line_item, values in figures.items():
-        existing = session.query(FinancialFigure).filter_by(
-            company_id=company.id,
-            line_item=line_item,
-            source_document=filepath
-        ).first()
-
-        if existing:
-            print(f"  {line_item}: already stored, skipping")
+    for fiscal_year_end, figures in result["years"].items():
+        if fiscal_year_end is None:
+            print(f"  Skipping a year block — no period-end date detected")
             continue
 
-        figure = FinancialFigure(
-            company_id=company.id,
-            line_item=line_item,
-            this_year_value=values["this_year_total"],
-            last_year_value=values["last_year_total"],
-            source_document=filepath,
-            retrieved_at=retrieved_at,
-            passed_consistency_check=consistency.get("consistent", False),
-            verified=False
-        )
-        session.add(figure)
-        session.commit()
+        for line_item, value in figures.items():
+            existing = session.query(FinancialFigure).filter_by(
+                company_id=company.id,
+                statement_type=statement_type,
+                line_item=line_item,
+                fiscal_year_end=fiscal_year_end,
+                source_document=filepath
+            ).first()
 
-        flag = "✓ consistency check passed" if consistency.get("consistent") else "⚠ FAILED consistency check — needs manual review"
-        print(f"  Saved {line_item}: {values} [{flag}]")
+            if existing:
+                print(f"  {fiscal_year_end} {line_item}: already stored, skipping")
+                continue
+
+            figure = FinancialFigure(
+                company_id=company.id,
+                statement_type=statement_type,
+                line_item=line_item,
+                fiscal_year_end=fiscal_year_end,
+                value=value,
+                source_document=filepath,
+                retrieved_at=retrieved_at,
+                passed_consistency_check=consistent,
+                verified=False
+            )
+            session.add(figure)
+            session.commit()
+
+            flag = "✓" if consistent else "⚠ FAILED — needs manual review"
+            print(f"  Saved {fiscal_year_end} {line_item}: {value} [{flag}]")
 
 if __name__ == "__main__":
     Session = sessionmaker(bind=engine)

@@ -35,9 +35,10 @@ class FinancialFigure(Base):
 
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey("companies.id"))
+    statement_type = Column(String)      # "income_statement", "balance_sheet", "cash_flow"
     line_item = Column(String)
-    this_year_value = Column(Integer)
-    last_year_value = Column(Integer)
+    fiscal_year_end = Column(String)     # e.g. "2026-02-28" — the actual period this figure belongs to
+    value = Column(Integer)
     source_document = Column(String)
     retrieved_at = Column(String)
     passed_consistency_check = Column(Boolean, default=False)
