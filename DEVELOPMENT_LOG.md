@@ -133,3 +133,17 @@ The IFRS concept layer exists and is proven correct in isolation, but is NOT YET
 **Next Steps**
 - Integrate the mapper/taxonomy into one parser at a time (income statement first, as the simplest), re-verifying all figures against source after each swap before moving to the next.
 - Only after all three parsers are migrated, consider removing the now-redundant internal keyword dictionaries.
+
+**17 July 2026 (cont.) - Income Statement Migrated to IFRS Concept Architecture**
+**Completed**
+- Refactored `income_statement_parser.py` to use the IFRS taxonomy (`app/ifrs/taxonomy.py`) for label matching, replacing the previous hardcoded `LINE_ITEM_RULES` dictionary.
+- Preserved the critical "last match wins" behaviour required to correctly distinguish a line item's true total from an earlier sub-component line sharing similar wording.
+- Added a concept-to-legacy-field-name translation layer so existing stored data, `store_financials.py`, and `view_financials.py` all continue working unchanged.
+- Verified all fourteen previously-confirmed figures (both companies, both years) remain byte-for-byte identical after the refactor — zero regression.
+- Confirmed the refactored parser correctly recognizes all existing stored rows as already-present, avoiding duplicate storage.
+**Current Status**
+Income statement extraction is now fully migrated to the shared IFRS concept architecture. Balance sheet and cash flow parsers remain on their original, still-correct, hardcoded keyword approach — next candidates for the same migration.
+**Next Steps**
+- Migrate `balance_sheet_parser.py` to the IFRS taxonomy (more involved, given its column-splitting and section-segmentation logic).
+- Migrate `cash_flow_parser.py` similarly.
+- Once all three are migrated, review whether the original per-parser keyword dictionaries can be safely removed.

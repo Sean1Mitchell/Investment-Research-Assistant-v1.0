@@ -1,23 +1,22 @@
 import pdfplumber
 import re
+import sys, os
 
-LINE_ITEM_RULES = {
-    "revenue": (["revenue"], []),
-    "cost_of_sales": (["cost of sales"], []),
-    "gross_profit": (["gross profit"], []),
-    "operating_profit": (["operating profit"], []),
-    "profit_before_tax": (["profit", "before tax"], []),
-    "taxation": ([], ["income tax", "taxation"]),
-    "profit_for_year": (["profit"], ["for the year", "for the financial period"]),
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "ifrs"))
+from taxonomy import match_label_to_concept
+
+# Maps new IFRS concept names back to the existing database field names,
+# so stored data and downstream code (store_financials.py, view_financials.py)
+# remain fully compatible — only the internal matching logic changes.
+CONCEPT_TO_LEGACY_KEY = {
+    "revenue": "revenue",
+    "cost_of_sales": "cost_of_sales",
+    "gross_profit": "gross_profit",
+    "operating_profit": "operating_profit",
+    "profit_before_tax": "profit_before_tax",
+    "tax_expense": "taxation",
+    "profit_after_tax": "profit_for_year",
 }
-
-def line_matches(line, required_all, required_any):
-    lower = line.lower()
-    if required_all and not all(k in lower for k in required_all):
-        return False
-    if required_any and not any(k in lower for k in required_any):
-        return False
-    return True
 
 def extract_numbers(line):
     pattern = r"\(?-?[\d,]+\)?|[-\u2013\u2014]"
@@ -96,18 +95,16 @@ def check_gross_profit_consistency(lines):
 
 def parse_income_statement(filepath, page_index=None):
     """
-    Extracts key income statement line items from a PDF, tagged with their
-    real fiscal year-end dates, plus a consistency check result.
+    Extracts key income statement line items from a PDF using the IFRS
+    concept-mapping layer (app/ifrs/taxonomy.py) rather than a hardcoded,
+    company-specific keyword dictionary — new wording variants are added
+    by editing app/ifrs/aliases.py, not this file.
 
-    Returns:
-        {
-            "statement_type": "income_statement",
-            "consistency_check": {...},
-            "years": {
-                "<this_year_end_date>": {"revenue": 123, ...},
-                "<last_year_end_date>": {"revenue": 456, ...},
-            }
-        }
+    Preserves the "last match wins" behaviour discovered during original
+    development: a concept's alias (e.g. "revenue") can match both a
+    sub-component line and the true total line, and since the true total
+    always appears LAST in the document, later matches are allowed to
+    overwrite earlier ones rather than stopping at the first hit.
     """
     if page_index is None:
         page_index = find_income_statement_page(filepath)
@@ -124,14 +121,19 @@ def parse_income_statement(filepath, page_index=None):
     this_year_figures = {}
     last_year_figures = {}
 
-    for key, (required_all, required_any) in LINE_ITEM_RULES.items():
-        for line in lines:
-            if line_matches(line, required_all, required_any):
-                numbers = extract_numbers(line)
-                if len(numbers) >= 6:
-                    last_six = numbers[-6:]
-                    this_year_figures[key] = last_six[2]
-                    last_year_figures[key] = last_six[5]
+    for line in lines:
+        concept = match_label_to_concept(line, statement="income_statement")
+        if not concept or concept not in CONCEPT_TO_LEGACY_KEY:
+            continue
+
+        numbers = extract_numbers(line)
+        if len(numbers) >= 6:
+            last_six = numbers[-6:]
+            legacy_key = CONCEPT_TO_LEGACY_KEY[concept]
+            this_year_figures[legacy_key] = last_six[2]
+            last_year_figures[legacy_key] = last_six[5]
+            # No break — a later matching line (the true total) is
+            # allowed to overwrite an earlier one (a sub-component).
 
     consistency = check_gross_profit_consistency(lines)
 
