@@ -15,11 +15,10 @@ for company in session.query(Company).all():
         key = (figure.statement_type, figure.fiscal_year_end)
         figures_by_statement_and_year.setdefault(key, []).append(figure)
 
-    for statement_type in ["income_statement", "balance_sheet"]:
+    for statement_type in ["income_statement", "balance_sheet", "cash_flow"]:
         print(f"\n  --- {statement_type} ---")
         years = sorted(
-            {k[1] for k in figures_by_statement_and_year if k[0] == statement_type},
-            reverse=True
+            {k[1] for k in figures_by_statement_and_year if k[0] == statement_type}
         )
         for year in years:
             print(f"\n    Year: {year}")

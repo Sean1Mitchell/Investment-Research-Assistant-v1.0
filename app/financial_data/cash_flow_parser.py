@@ -40,11 +40,13 @@ def extract_numbers(line):
 
 def merge_split_lines(lines_dict, year_count):
     """
-    Fixes a real PDF-rendering quirk (also seen in the balance sheet):
-    a row occasionally splits across two y-positions, with some numbers
-    landing on the line after a label. Merges a following bare-number-only
-    line into the line above it if the label line has fewer numbers than
-    the expected year count.
+    Merges a genuinely adjacent bare-number continuation line into the
+    labeled line directly above it. Known limitation: does not catch
+    fragments that land BEFORE their label rather than after — this
+    pattern was also seen in the balance sheet parser, and rather than
+    add fragile bidirectional search logic for a small number of
+    affected fields, those fields are simply left as None when this
+    occurs, with downstream logic treating them as optional.
     """
     sorted_keys = sorted(lines_dict.keys())
     merged = {}
@@ -91,13 +93,10 @@ def reconstruct_reading_order(words, page_width, year_count):
     boundary = find_column_boundary(words, page_width)
     left_words = [w for w in words if w["x0"] < boundary]
     right_words = [w for w in words if w["x0"] >= boundary]
-
     left_lines_raw = group_words_into_lines(left_words)
     right_lines_raw = group_words_into_lines(right_words)
-
     left_lines = merge_split_lines(left_lines_raw, year_count)
     right_lines = merge_split_lines(right_lines_raw, year_count)
-
     ordered = []
     for y in sorted(left_lines.keys()):
         ordered.append(left_lines[y])
@@ -141,14 +140,25 @@ def find_cash_flow_page(filepath):
     return None
 
 def check_cash_flow_consistency(derived_net_increase, cash_at_beginning, cash_at_end):
-    if not derived_net_increase or not cash_at_beginning or not cash_at_end:
-        return {"checked": False, "consistent": False}
+    """
+    Checks the derived net increase against the actual change in cash
+    balance, when both ends of that balance are available. If cash_at_end
+    could not be reliably parsed (a known, occasional PDF-layout gap),
+    the check is marked as un-performed rather than failed — an honest
+    'we don't know' is preferable to a false negative.
+    """
+    if not derived_net_increase or not cash_at_beginning:
+        return {"checked": False, "consistent": False, "reason": "missing required figures"}
+    if not cash_at_end:
+        return {"checked": False, "consistent": False, "reason": "cash_at_end could not be parsed for this report"}
+
     results = []
     for net, start, end in zip(derived_net_increase, cash_at_beginning, cash_at_end):
         actual_change = end - start
         difference = abs(actual_change - net)
         tolerance = max(5, abs(start) * 0.02)
         results.append(difference <= tolerance)
+
     return {"checked": True, "consistent": all(results)}
 
 def parse_cash_flow_statement(filepath, page_index=None):
@@ -162,11 +172,8 @@ def parse_cash_flow_statement(filepath, page_index=None):
         words = page.extract_words()
         page_width = page.width
 
-    # First pass with a temporary reading order to detect year count
     boundary_check_lines = reconstruct_reading_order(words, page_width, year_count=2)
     year_count = detect_year_count(boundary_check_lines)
-
-    # Second pass, merging with the correct year count
     reading_order_lines = reconstruct_reading_order(words, page_width, year_count)
     period_dates = extract_period_end_dates(reading_order_lines, year_count)
 
@@ -179,6 +186,9 @@ def parse_cash_flow_statement(filepath, page_index=None):
                 if len(numbers) >= year_count:
                     results[key] = numbers[-year_count:]
                     break
+                # Line matched but had too few numbers (e.g. a fragment
+                # landed before the label rather than after) — leave
+                # this field unset rather than store an incomplete value.
 
     net_increase_derived = None
     if all(k in results for k in ["net_cash_operating", "net_cash_investing", "net_cash_financing"]):

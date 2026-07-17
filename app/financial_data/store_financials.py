@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "database"))
 from database import Company, FinancialFigure, engine
 from income_statement_parser import parse_income_statement
 from balance_sheet_parser import parse_balance_sheet
+from cash_flow_parser import parse_cash_flow_statement
 from sqlalchemy.orm import sessionmaker
 
 COMPANY_REPORTS = {
@@ -47,7 +48,7 @@ def store_statement_results(session, company, filepath, result):
             session.add(figure)
             session.commit()
 
-            flag = "✓" if consistent else "⚠ FAILED — needs manual review"
+            flag = "✓" if consistent else "⚠ needs manual review"
             print(f"  [{statement_type}] Saved {fiscal_year_end} {line_item}: {value} [{flag}]")
 
 def store_financials_for_company(session, company, filepath):
@@ -56,6 +57,9 @@ def store_financials_for_company(session, company, filepath):
 
     balance_sheet_result = parse_balance_sheet(filepath)
     store_statement_results(session, company, filepath, balance_sheet_result)
+
+    cash_flow_result = parse_cash_flow_statement(filepath)
+    store_statement_results(session, company, filepath, cash_flow_result)
 
 if __name__ == "__main__":
     Session = sessionmaker(bind=engine)
