@@ -3,6 +3,7 @@ from datetime import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "database"))
 from database import Company, FinancialFigure, engine
 from income_statement_parser import parse_income_statement
+from balance_sheet_parser import parse_balance_sheet
 from sqlalchemy.orm import sessionmaker
 
 COMPANY_REPORTS = {
@@ -10,18 +11,16 @@ COMPANY_REPORTS = {
     "J SAINSBURY PLC": "scratch/J_SAINSBURY_PLC_report.pdf",
 }
 
-def store_financials_for_company(session, company, filepath):
-    result = parse_income_statement(filepath)
+def store_statement_results(session, company, filepath, result):
     statement_type = result["statement_type"]
     consistent = result["consistency_check"].get("consistent", False)
     retrieved_at = datetime.utcnow().isoformat()
 
     for fiscal_year_end, figures in result["years"].items():
-        if fiscal_year_end is None:
-            print(f"  Skipping a year block — no period-end date detected")
-            continue
-
         for line_item, value in figures.items():
+            if value is None:
+                continue
+
             existing = session.query(FinancialFigure).filter_by(
                 company_id=company.id,
                 statement_type=statement_type,
@@ -31,7 +30,7 @@ def store_financials_for_company(session, company, filepath):
             ).first()
 
             if existing:
-                print(f"  {fiscal_year_end} {line_item}: already stored, skipping")
+                print(f"  [{statement_type}] {fiscal_year_end} {line_item}: already stored, skipping")
                 continue
 
             figure = FinancialFigure(
@@ -49,7 +48,14 @@ def store_financials_for_company(session, company, filepath):
             session.commit()
 
             flag = "✓" if consistent else "⚠ FAILED — needs manual review"
-            print(f"  Saved {fiscal_year_end} {line_item}: {value} [{flag}]")
+            print(f"  [{statement_type}] Saved {fiscal_year_end} {line_item}: {value} [{flag}]")
+
+def store_financials_for_company(session, company, filepath):
+    income_result = parse_income_statement(filepath)
+    store_statement_results(session, company, filepath, income_result)
+
+    balance_sheet_result = parse_balance_sheet(filepath)
+    store_statement_results(session, company, filepath, balance_sheet_result)
 
 if __name__ == "__main__":
     Session = sessionmaker(bind=engine)

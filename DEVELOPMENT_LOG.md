@@ -104,3 +104,19 @@ The database can now cleanly support multiple years of financial data per compan
 - Extend parsing to the balance sheet and cash flow statement, using the same year-tagged approach.
 - Attach supporting disclosure/policy information to each statement year.
 - Pull and process multiple prior years' annual reports for both tracked companies.
+
+**17 July 2026 (cont.) - Balance Sheet Extraction**
+**Completed**
+- Built a general-purpose balance sheet parser handling a genuinely harder layout than the income statement: two-column pages requiring word-position analysis (not just plain text extraction) to correctly separate assets from liabilities.
+- Diagnosed and fixed multiple real structural challenges through iterative testing against both companies: incorrect column-boundary detection, a false-positive section-header match, an over-aggressive line-merge fix that had to be corrected to check both directions, and a genuinely tricky date-extraction case requiring recognition of the "most recent year first" convention rather than positional guessing.
+- Handled a genuine structural difference between companies: Tesco presents an implicit "net assets" format with no stated "Total assets" figure, while Sainsbury's states explicit "Total assets"/"Total liabilities" totals — solved generally by deriving total assets/liabilities from already-verified section subtotals rather than chasing a fragile, inconsistently-labeled line.
+- Built automatic detection of how many years of data a report shows (2 for Tesco, 3 for Sainsbury's), rather than assuming a fixed count.
+- Added a genuine accounting-identity consistency check (Total assets = Total liabilities + Equity), passing for all years, both companies.
+- Extended `store_financials.py` and `view_financials.py` to handle multiple statement types cleanly.
+**Current Status**
+Both the income statement and balance sheet are now fully automated end-to-end for both tracked companies, across all available years, with verified consistency checks passing throughout.
+**Next Steps**
+- Extend the same approach to the cash flow statement.
+- Fix a minor display-ordering issue in the financials viewer (string-sorting dates rather than sorting chronologically).
+- Attach supporting disclosure/policy information to each statement year.
+- Pull and process multiple prior years' annual reports for both companies.

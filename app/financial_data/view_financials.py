@@ -10,12 +10,19 @@ for company in session.query(Company).all():
     print(f"\n{company.name}")
     print("=" * 50)
 
-    figures_by_year = {}
+    figures_by_statement_and_year = {}
     for figure in company.financials:
-        figures_by_year.setdefault(figure.fiscal_year_end, []).append(figure)
+        key = (figure.statement_type, figure.fiscal_year_end)
+        figures_by_statement_and_year.setdefault(key, []).append(figure)
 
-    for year_end in sorted(figures_by_year.keys(), reverse=True):
-        print(f"\n  Year ending {year_end}:")
-        for figure in figures_by_year[year_end]:
-            flag = "✓" if figure.passed_consistency_check else "⚠"
-            print(f"    {figure.line_item}: {figure.value} [{flag}]")
+    for statement_type in ["income_statement", "balance_sheet"]:
+        print(f"\n  --- {statement_type} ---")
+        years = sorted(
+            {k[1] for k in figures_by_statement_and_year if k[0] == statement_type},
+            reverse=True
+        )
+        for year in years:
+            print(f"\n    Year: {year}")
+            for figure in figures_by_statement_and_year[(statement_type, year)]:
+                flag = "✓" if figure.passed_consistency_check else "⚠"
+                print(f"      {figure.line_item}: {figure.value} [{flag}]")
