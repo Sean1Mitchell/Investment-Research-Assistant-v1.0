@@ -120,3 +120,16 @@ Both the income statement and balance sheet are now fully automated end-to-end f
 - Fix a minor display-ordering issue in the financials viewer (string-sorting dates rather than sorting chronologically).
 - Attach supporting disclosure/policy information to each statement year.
 - Pull and process multiple prior years' annual reports for both companies.
+
+**17 July 2026 (cont.) - IFRS Concept-Mapping Architecture (Foundation)**
+**Completed**
+- Designed and built a new concept-driven mapping layer, separate from the existing layout/coordinate extraction logic: `app/ifrs/concepts.py`, `app/ifrs/aliases.py`, `app/ifrs/taxonomy.py`, `app/statements/mapper.py`, `app/statements/validator.py`.
+- This centralizes label-to-concept matching (previously duplicated as separate keyword dictionaries across the income statement, balance sheet, and cash flow parsers) into one shared, growing taxonomy.
+- Deliberately preserved all existing coordinate/column-splitting logic, Playwright discovery, and Companies House retrieval — this new layer only replaces label interpretation, not physical page-layout reconstruction, which remains a genuinely separate and already-solved problem.
+- Verified the new mapping layer standalone against real, previously hand-verified Tesco balance sheet lines — all six labeled concepts resolved correctly.
+- Verified the validator standalone against known-correct figures.
+**Current Status**
+The IFRS concept layer exists and is proven correct in isolation, but is NOT YET wired into the live parsers — `income_statement_parser.py`, `balance_sheet_parser.py`, and `cash_flow_parser.py` still use their own internal keyword dictionaries, unchanged, and remain the source of truth for stored data.
+**Next Steps**
+- Integrate the mapper/taxonomy into one parser at a time (income statement first, as the simplest), re-verifying all figures against source after each swap before moving to the next.
+- Only after all three parsers are migrated, consider removing the now-redundant internal keyword dictionaries.
