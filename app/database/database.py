@@ -35,16 +35,23 @@ class FinancialFigure(Base):
 
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey("companies.id"))
-    statement_type = Column(String)      # "income_statement", "balance_sheet", "cash_flow"
+    statement_type = Column(String)
     line_item = Column(String)
-    fiscal_year_end = Column(String)     # e.g. "2026-02-28" — the actual period this figure belongs to
-    value = Column(Integer)
+    fiscal_year_end = Column(String)
+    value = Column(Integer)               # original, machine-extracted figure — never overwritten
+    corrected_value = Column(Integer)      # nullable; set only if a human edits the figure
     source_document = Column(String)
     retrieved_at = Column(String)
     passed_consistency_check = Column(Boolean, default=False)
-    verified = Column(Boolean, default=False)
+    verified = Column(Boolean, default=False)  # True once a human has reviewed (confirmed or corrected)
 
     company = relationship("Company", back_populates="financials")
+
+    @property
+    def effective_value(self):
+        """The figure to actually use for analysis: the human correction
+        if one exists, otherwise the original machine-extracted value."""
+        return self.corrected_value if self.corrected_value is not None else self.value
 
 
 engine = create_engine("sqlite:///research.db")

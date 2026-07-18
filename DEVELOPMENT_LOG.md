@@ -174,3 +174,16 @@ The full extraction pipeline now uses a centralized, shared accounting-concept v
 - Review whether any now fully-unused legacy code remains and can be safely removed.
 - Add new companies to genuinely test how well the shared taxonomy generalizes beyond Tesco and Sainsbury's.
 - Resume the original roadmap: attaching supporting disclosure/policy information to each statement year, and pulling additional historical years.
+
+**17 July 2026 (cont.) - Cash Flow Reconciliation Fallback; Verification Schema Foundation**
+**Completed**
+- Discovered a real bug: cash flow parser was storing a metadata tag (`cash_at_end_source`) as if it were a numeric financial figure. Fixed `store_financials.py` to explicitly filter out non-numeric metadata fields before storage, and removed the two bad rows already saved.
+- Added a genuine, evidence-based fallback for `cash_at_end`: when the primary statement line can't be fully parsed (a known PDF-layout limitation), the parser now checks for a "Disclosed in the balance sheet" reconciliation section some companies include, which independently restates the closing cash balance as a clean, complete line. Verified this fallback produces the correct, real figure for Sainsbury's.
+- Diagnosed why the resulting consistency check still failed for Sainsbury's: the derived net cash movement is stated on a continuing-operations-only basis, while cash_at_beginning/cash_at_end are total balances (continuing + discontinued). Confirmed this is a genuine, legitimate basis difference, not an error — the computed gap ([-718, 1345]) matches Sainsbury's own stated "Discontinued operations" line exactly.
+- Rewrote the consistency check to report this honestly as a possible basis mismatch, with supporting gap figures, rather than an unexplained failure.
+- Designed the human verification/correction workflow: added a `corrected_value` column (nullable, never overwrites the original machine-extracted `value`) and an `effective_value` property that returns the correction if one exists, otherwise the original figure. This preserves full extraction history while giving a clear "figure to actually use" for analysis.
+**Current Status**
+All three statement parsers are IFRS-taxonomy-based, verified against known-correct data, and now include proper metadata/figure separation and a schema foundation for human review and correction — but the actual review/edit interface has not yet been built.
+**Next Steps**
+- Build a review interface (likely Streamlit, as previously discussed) showing extracted figures per company/statement/year, allowing correction of values and addition of missed line items, with a clear visual distinction between unverified and human-verified data.
+- Consider extending the same corrected_value/verified pattern to entirely new, manually-added line items the automated extraction never captured.

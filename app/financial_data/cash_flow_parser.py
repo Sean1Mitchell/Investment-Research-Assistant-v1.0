@@ -126,29 +126,67 @@ def find_cash_flow_page(filepath):
                 return i
     return None
 
+def find_reconciliation_cash_balance(lines, year_count):
+    """
+    Fallback source for the closing cash balance: some companies restate
+    it in a 'Disclosed in the balance sheet' reconciliation, as a clean,
+    complete bare-number line — with none of the note-reference/split-line
+    fragility that can affect the primary 'Closing cash and cash
+    equivalents' line. Used only when the primary line couldn't be
+    reliably parsed with a full set of values.
+    """
+    found_section = False
+    for line in lines:
+        if "disclosed in the balance sheet" in line.lower():
+            found_section = True
+            continue
+        if found_section and not has_letters(line):
+            numbers = extract_numbers(line)
+            if len(numbers) >= year_count:
+                return numbers[-year_count:]
+    return None
+
 def check_cash_flow_consistency(derived_net_increase, cash_at_beginning, cash_at_end):
+    """
+    Checks derived net increase (operating + investing + financing)
+    against the actual cash movement. Note: derived_net_increase reflects
+    CONTINUING OPERATIONS ONLY, since operating/investing/financing totals
+    are stated on that basis. cash_at_beginning/cash_at_end are TOTAL
+    balances (continuing + discontinued combined). For a company with no
+    discontinued operations in the period, these should reconcile closely.
+    For a company WITH discontinued operations, a gap is expected and
+    legitimate, not an error — it's flagged distinctly as a basis
+    mismatch rather than a failed check, since the underlying figures
+    may all be individually correct.
+    """
     if not derived_net_increase or not cash_at_beginning:
         return {"checked": False, "consistent": False, "reason": "missing required figures"}
     if not cash_at_end:
         return {"checked": False, "consistent": False, "reason": "cash_at_end could not be parsed for this report"}
 
     results = []
+    gaps = []
     for net, start, end in zip(derived_net_increase, cash_at_beginning, cash_at_end):
         actual_change = end - start
-        difference = abs(actual_change - net)
+        difference = actual_change - net
         tolerance = max(5, abs(start) * 0.02)
-        results.append(difference <= tolerance)
+        results.append(abs(difference) <= tolerance)
+        gaps.append(difference)
 
-    return {"checked": True, "consistent": all(results)}
+    if all(results):
+        return {"checked": True, "consistent": True}
+
+    # A large, consistent gap likely reflects continuing-vs-total basis
+    # difference (e.g. discontinued operations) rather than a genuine
+    # extraction error. Report this honestly rather than as a plain failure.
+    return {
+        "checked": True,
+        "consistent": False,
+        "possible_reason": "gap may reflect discontinued operations or other basis difference between the derived continuing-operations figure and the total cash balance movement",
+        "gaps_by_year": gaps,
+    }
 
 def parse_cash_flow_statement(filepath, page_index=None):
-    """
-    Extracts key cash flow figures using the IFRS taxonomy for label
-    matching, replacing the previous hardcoded LINE_ITEM_KEYWORDS
-    dictionary. All column-splitting, line-merging, and derivation logic
-    (net_increase_in_cash_derived) is preserved unchanged — these are
-    layout/arithmetic concerns, not label-wording concerns.
-    """
     if page_index is None:
         page_index = find_cash_flow_page(filepath)
         if page_index is None:
@@ -172,9 +210,14 @@ def parse_cash_flow_statement(filepath, page_index=None):
         numbers = extract_numbers(line)
         if len(numbers) >= year_count:
             results[concept] = numbers[-year_count:]
-            # No break — consistent with the income statement's "last
-            # match wins" behaviour, in case any company's wording
-            # produces an earlier false-positive sub-line match.
+
+    # Fallback: if the primary line for cash_at_end couldn't be fully
+    # parsed, try the balance-sheet reconciliation section instead.
+    if "cash_at_end" not in results:
+        fallback = find_reconciliation_cash_balance(reading_order_lines, year_count)
+        if fallback:
+            results["cash_at_end"] = fallback
+            results["cash_at_end_source"] = "balance_sheet_reconciliation_fallback"
 
     net_increase_derived = None
     if all(k in results for k in ["net_cash_operating", "net_cash_investing", "net_cash_financing"]):
@@ -198,7 +241,7 @@ def parse_cash_flow_statement(filepath, page_index=None):
         if date is None:
             continue
         years_output[date] = {
-            key: (values[i] if values else None)
+            key: (values[i] if isinstance(values, list) else values)
             for key, values in results.items()
         }
 

@@ -12,6 +12,14 @@ COMPANY_REPORTS = {
     "J SAINSBURY PLC": "scratch/J_SAINSBURY_PLC_report.pdf",
 }
 
+# Metadata fields a parser may attach alongside real figures (e.g.
+# provenance tags) — these describe a figure, they ARE NOT figures
+# themselves, and must never be stored as their own database row.
+METADATA_SUFFIXES = ("_source",)
+
+def is_metadata_field(line_item):
+    return any(line_item.endswith(suffix) for suffix in METADATA_SUFFIXES)
+
 def store_statement_results(session, company, filepath, result):
     statement_type = result["statement_type"]
     consistent = result["consistency_check"].get("consistent", False)
@@ -20,6 +28,11 @@ def store_statement_results(session, company, filepath, result):
     for fiscal_year_end, figures in result["years"].items():
         for line_item, value in figures.items():
             if value is None:
+                continue
+            if is_metadata_field(line_item):
+                continue
+            if not isinstance(value, (int, float)):
+                print(f"  [{statement_type}] Skipping non-numeric field '{line_item}': {value!r}")
                 continue
 
             existing = session.query(FinancialFigure).filter_by(
