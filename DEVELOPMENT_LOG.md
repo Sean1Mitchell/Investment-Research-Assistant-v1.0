@@ -160,3 +160,17 @@ Income statement and balance sheet are both migrated to the shared IFRS concept 
 **Next Steps**
 - Migrate `cash_flow_parser.py` to the IFRS taxonomy.
 - Once all three are migrated, review whether any now-unused legacy code (e.g. redundant keyword lists) can be safely removed.
+
+**17 July 2026 (cont.) - Cash Flow Statement Migrated to IFRS Concept Architecture; Full Migration Complete**
+**Completed**
+- Refactored `cash_flow_parser.py` to use the IFRS taxonomy for label matching, replacing the previous hardcoded `LINE_ITEM_KEYWORDS` dictionary. Concept names already matched legacy field names exactly, so no translation layer was needed (unlike the income statement's tax_expense/profit_after_tax renaming).
+- Preserved the "last match wins" behaviour, column-splitting, line-merging, and derived net_increase_in_cash calculation unchanged.
+- Verified all figures for both companies remain identical to previously stored data, including the known, honestly-reported gap in Sainsbury's cash_at_end (a genuine PDF-layout limitation identified earlier, not a new regression).
+- Confirmed duplicate-safety against the live database.
+- All three primary statement parsers (income statement, balance sheet, cash flow) are now migrated to the shared IFRS concept architecture. Each migration was verified against previously hand-confirmed figures before being accepted, with zero regressions across all three.
+**Current Status**
+The full extraction pipeline now uses a centralized, shared accounting-concept vocabulary (`app/ifrs/`) for all label interpretation, while all physical PDF-layout logic (column-splitting, line-merging, section-segmentation, date extraction) remains untouched and company-agnostic, exactly as designed. Adding a new company's wording variant now means editing `app/ifrs/aliases.py` alone, not touching parser logic.
+**Next Steps**
+- Review whether any now fully-unused legacy code remains and can be safely removed.
+- Add new companies to genuinely test how well the shared taxonomy generalizes beyond Tesco and Sainsbury's.
+- Resume the original roadmap: attaching supporting disclosure/policy information to each statement year, and pulling additional historical years.

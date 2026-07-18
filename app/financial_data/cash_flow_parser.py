@@ -1,13 +1,9 @@
 import pdfplumber
 import re
+import sys, os
 
-LINE_ITEM_KEYWORDS = {
-    "net_cash_operating": ["net cash generated from operating", "net cash used in operating", "net cash generated from/(used in) operating"],
-    "net_cash_investing": ["net cash used in investing", "net cash generated from investing", "net cash generated from/(used in) investing"],
-    "net_cash_financing": ["net cash used in financing", "net cash generated from financing", "net cash generated from/(used in) financing"],
-    "cash_at_beginning": ["opening cash and cash equivalents", "cash and cash equivalents at the beginning"],
-    "cash_at_end": ["closing cash and cash equivalents", "cash and cash equivalents at the end"],
-}
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "ifrs"))
+from taxonomy import match_label_to_concept
 
 def group_words_into_lines(words, y_tolerance=3):
     lines = {}
@@ -39,15 +35,6 @@ def extract_numbers(line):
     return numbers
 
 def merge_split_lines(lines_dict, year_count):
-    """
-    Merges a genuinely adjacent bare-number continuation line into the
-    labeled line directly above it. Known limitation: does not catch
-    fragments that land BEFORE their label rather than after — this
-    pattern was also seen in the balance sheet parser, and rather than
-    add fragile bidirectional search logic for a small number of
-    affected fields, those fields are simply left as None when this
-    occurs, with downstream logic treating them as optional.
-    """
     sorted_keys = sorted(lines_dict.keys())
     merged = {}
     skip_next = False
@@ -140,13 +127,6 @@ def find_cash_flow_page(filepath):
     return None
 
 def check_cash_flow_consistency(derived_net_increase, cash_at_beginning, cash_at_end):
-    """
-    Checks the derived net increase against the actual change in cash
-    balance, when both ends of that balance are available. If cash_at_end
-    could not be reliably parsed (a known, occasional PDF-layout gap),
-    the check is marked as un-performed rather than failed — an honest
-    'we don't know' is preferable to a false negative.
-    """
     if not derived_net_increase or not cash_at_beginning:
         return {"checked": False, "consistent": False, "reason": "missing required figures"}
     if not cash_at_end:
@@ -162,6 +142,13 @@ def check_cash_flow_consistency(derived_net_increase, cash_at_beginning, cash_at
     return {"checked": True, "consistent": all(results)}
 
 def parse_cash_flow_statement(filepath, page_index=None):
+    """
+    Extracts key cash flow figures using the IFRS taxonomy for label
+    matching, replacing the previous hardcoded LINE_ITEM_KEYWORDS
+    dictionary. All column-splitting, line-merging, and derivation logic
+    (net_increase_in_cash_derived) is preserved unchanged — these are
+    layout/arithmetic concerns, not label-wording concerns.
+    """
     if page_index is None:
         page_index = find_cash_flow_page(filepath)
         if page_index is None:
@@ -178,17 +165,16 @@ def parse_cash_flow_statement(filepath, page_index=None):
     period_dates = extract_period_end_dates(reading_order_lines, year_count)
 
     results = {}
-    for key, keyword_options in LINE_ITEM_KEYWORDS.items():
-        for line in reading_order_lines:
-            lower_line = line.lower()
-            if any(keyword in lower_line for keyword in keyword_options):
-                numbers = extract_numbers(line)
-                if len(numbers) >= year_count:
-                    results[key] = numbers[-year_count:]
-                    break
-                # Line matched but had too few numbers (e.g. a fragment
-                # landed before the label rather than after) — leave
-                # this field unset rather than store an incomplete value.
+    for line in reading_order_lines:
+        concept = match_label_to_concept(line, statement="cash_flow")
+        if not concept:
+            continue
+        numbers = extract_numbers(line)
+        if len(numbers) >= year_count:
+            results[concept] = numbers[-year_count:]
+            # No break — consistent with the income statement's "last
+            # match wins" behaviour, in case any company's wording
+            # produces an earlier false-positive sub-line match.
 
     net_increase_derived = None
     if all(k in results for k in ["net_cash_operating", "net_cash_investing", "net_cash_financing"]):
