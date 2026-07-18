@@ -187,3 +187,18 @@ All three statement parsers are IFRS-taxonomy-based, verified against known-corr
 **Next Steps**
 - Build a review interface (likely Streamlit, as previously discussed) showing extracted figures per company/statement/year, allowing correction of values and addition of missed line items, with a clear visual distinction between unverified and human-verified data.
 - Consider extending the same corrected_value/verified pattern to entirely new, manually-added line items the automated extraction never captured.
+
+**17 July 2026 (cont.) - Permanent Document Storage and Source Document Tracking**
+**Completed**
+- Moved both companies' downloaded annual report PDFs from disposable `scratch/` into permanent storage at `app/documents/`.
+- Added a `SourceDocument` table, giving each downloaded document its own tracked record (file path, origin URL, document type, download timestamp) rather than being referenced only as a loose path string.
+- Added `source_document_id` foreign key to `FinancialFigure`, properly linking every extracted figure back to the specific document it came from.
+- Migrated all 87 existing figures (40 Tesco, 47 Sainsbury's) to reference their correct `SourceDocument` records, with no data loss.
+- Updated `store_financials.py` to use the new permanent document paths and to automatically create `SourceDocument` records for any future company added to the pipeline, rather than this being a one-off manual migration.
+- Verified full duplicate-safety against the new `source_document_id`-based lookup — confirms the migration correctly linked all existing data.
+**Current Status**
+Every extracted financial figure now has a genuine, queryable link back to its actual source PDF, laying the foundation for the planned verification queue — which will display the source document and its extracted figures side by side for human review.
+**Next Steps**
+- Design sidebar structure and build the Streamlit application shell (Dashboard, Companies, Verification Queue, Company View, Compare, Account & Settings).
+- Build the Verification Queue as the first functional screen: source PDF display alongside editable, approvable figures.
+- Only after a figure is human-approved should it appear in Company View / Compare.

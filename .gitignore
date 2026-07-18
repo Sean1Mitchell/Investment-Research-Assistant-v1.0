@@ -4,3 +4,4 @@ venv/
 scratch/
 __pycache__/
 *.pyc
+app/documents/*.pdf

@@ -15,6 +15,7 @@ class Company(Base):
 
     filings = relationship("Filing", back_populates="company")
     financials = relationship("FinancialFigure", back_populates="company")
+    documents = relationship("SourceDocument", back_populates="company")
 
 
 class Filing(Base):
@@ -30,6 +31,21 @@ class Filing(Base):
     company = relationship("Company", back_populates="filings")
 
 
+class SourceDocument(Base):
+    __tablename__ = "source_documents"
+
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey("companies.id"))
+    document_type = Column(String)       # e.g. "annual_report"
+    file_path = Column(String)           # permanent location, e.g. app/documents/...
+    original_url = Column(String)        # where it was downloaded from
+    fiscal_year_end = Column(String)     # primary year this document covers, where known
+    downloaded_at = Column(String)
+
+    company = relationship("Company", back_populates="documents")
+    financials = relationship("FinancialFigure", back_populates="source_document_ref")
+
+
 class FinancialFigure(Base):
     __tablename__ = "financial_figures"
 
@@ -38,19 +54,19 @@ class FinancialFigure(Base):
     statement_type = Column(String)
     line_item = Column(String)
     fiscal_year_end = Column(String)
-    value = Column(Integer)               # original, machine-extracted figure — never overwritten
-    corrected_value = Column(Integer)      # nullable; set only if a human edits the figure
-    source_document = Column(String)
+    value = Column(Integer)
+    corrected_value = Column(Integer)
+    source_document = Column(String)     # kept temporarily for backward compatibility
+    source_document_id = Column(Integer, ForeignKey("source_documents.id"))
     retrieved_at = Column(String)
     passed_consistency_check = Column(Boolean, default=False)
-    verified = Column(Boolean, default=False)  # True once a human has reviewed (confirmed or corrected)
+    verified = Column(Boolean, default=False)
 
     company = relationship("Company", back_populates="financials")
+    source_document_ref = relationship("SourceDocument", back_populates="financials")
 
     @property
     def effective_value(self):
-        """The figure to actually use for analysis: the human correction
-        if one exists, otherwise the original machine-extracted value."""
         return self.corrected_value if self.corrected_value is not None else self.value
 
 
