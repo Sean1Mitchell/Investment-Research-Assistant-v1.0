@@ -1,13 +1,23 @@
 import pdfplumber
 import re
+import sys, os
 
-SECTION_HEADERS = [
-    "non-current assets",
-    "current assets",
-    "non-current liabilities",
-    "current liabilities",
-    "equity",
-]
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "ifrs"))
+from taxonomy import match_label_to_concept
+
+# Section headers this parser looks for, and which IFRS concept each
+# corresponds to. "equity" is handled as an explicit special case: its
+# taxonomy alias ("total equity", "net assets") describes the section's
+# VALUE line, not its HEADER line (the bare word "Equity") — these are
+# genuinely different things, so equity's header is matched literally
+# rather than forced through the concept layer where it doesn't fit.
+SECTION_CONCEPTS = {
+    "non_current_assets_total": "non-current assets",
+    "current_assets_total": "current assets",
+    "non_current_liabilities_total": "non-current liabilities",
+    "current_liabilities_total": "current liabilities",
+}
+EQUITY_HEADER = "equity"
 
 def group_words_into_lines(words, y_tolerance=3):
     lines = {}
@@ -84,15 +94,6 @@ def detect_year_count(lines_dict):
     return len(unique_years) if len(unique_years) >= 2 else 2
 
 def extract_period_end_dates(lines_dict, year_count):
-    """
-    Extracts the stated 'as at' dates. Tries a clean single-line full-date
-    match first (e.g. '28 February 2026'). If dates are split across lines
-    (day-month on one line, year on another), falls back to: collecting
-    all day-month fragments in reading order, and all distinct years,
-    then sorting years DESCENDING and pairing positionally — since UK
-    financial statements always present years most-recent-first, left to
-    right, regardless of how the text happens to be split across lines.
-    """
     combined_lines = [line_text(lines_dict[y]) for y in sorted(lines_dict.keys())[:6]]
     combined_text = " ".join(combined_lines)
 
@@ -105,26 +106,41 @@ def extract_period_end_dates(lines_dict, year_count):
         r"\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December)\b"
     )
     year_pattern = re.compile(r"\b20\d{2}\b")
-
     day_months = day_month_pattern.findall(combined_text)
     years = sorted(set(year_pattern.findall(combined_text)), reverse=True)
-
     day_months = day_months[:year_count]
     years = years[:year_count]
-
     if len(day_months) == year_count and len(years) == year_count:
         return [f"{day_months[i]} {years[i]}" for i in range(year_count)]
-
     return [None] * year_count
+
+def identify_section(text):
+    """
+    Determines which balance sheet section (if any) a line represents,
+    using the IFRS taxonomy for the four asset/liability categories.
+    Equity is matched as an explicit literal header, since its taxonomy
+    alias describes the section's total VALUE line, not its header —
+    see the module-level note on SECTION_CONCEPTS for why this isn't
+    forced through the concept layer.
+    """
+    lower = text.lower().strip()
+    if lower == EQUITY_HEADER:
+        return "equity"
+
+    concept = match_label_to_concept(text, statement="balance_sheet")
+    for concept_name, _ in SECTION_CONCEPTS.items():
+        if concept == concept_name and lower == SECTION_CONCEPTS[concept_name]:
+            return concept_name
+    return None
 
 def segment_column_into_sections(merged_lines):
     sections = {}
     current_section = None
     for y in sorted(merged_lines.keys()):
         text = merged_lines[y]
-        lower = text.lower().strip()
-        if lower in SECTION_HEADERS:
-            current_section = lower
+        section = identify_section(text)
+        if section:
+            current_section = section
             sections[current_section] = []
             continue
         if current_section:
@@ -132,6 +148,13 @@ def segment_column_into_sections(merged_lines):
     return sections
 
 def section_subtotal(section_lines, year_count):
+    """
+    Finds a section's subtotal: the last bare-number-only line, or (for
+    equity, which never has a bare-number total) the last line containing
+    the word 'total'. This remains a structural/positional rule rather
+    than a taxonomy lookup, since a subtotal line by definition carries
+    no distinguishing label text to match against.
+    """
     last_bare = None
     last_total_labeled = None
     for line in section_lines:
@@ -202,10 +225,10 @@ def parse_balance_sheet(filepath, page_index=None):
     for name, lines in all_sections.items():
         section_values[name] = section_subtotal(lines, year_count)
 
-    non_curr_assets = section_values.get("non-current assets")
-    curr_assets = section_values.get("current assets")
-    non_curr_liab = section_values.get("non-current liabilities")
-    curr_liab = section_values.get("current liabilities")
+    non_curr_assets = section_values.get("non_current_assets_total")
+    curr_assets = section_values.get("current_assets_total")
+    non_curr_liab = section_values.get("non_current_liabilities_total")
+    curr_liab = section_values.get("current_liabilities_total")
     equity = section_values.get("equity")
 
     total_assets = (

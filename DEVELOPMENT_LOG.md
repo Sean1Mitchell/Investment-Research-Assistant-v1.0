@@ -147,3 +147,16 @@ Income statement extraction is now fully migrated to the shared IFRS concept arc
 - Migrate `balance_sheet_parser.py` to the IFRS taxonomy (more involved, given its column-splitting and section-segmentation logic).
 - Migrate `cash_flow_parser.py` similarly.
 - Once all three are migrated, review whether the original per-parser keyword dictionaries can be safely removed.
+
+**17 July 2026 (cont.) - Balance Sheet Migrated to IFRS Concept Architecture**
+**Completed**
+- Refactored `balance_sheet_parser.py` to use the IFRS taxonomy for section-header identification (non-current/current assets and liabilities), replacing the previous hardcoded `SECTION_HEADERS` list.
+- Identified and deliberately preserved an important distinction: equity's taxonomy alias ("total equity", "net assets") describes its VALUE line, not its HEADER line (the bare word "Equity") — these are genuinely different things, so equity's section header is matched as an explicit literal case rather than incorrectly forced through the concept layer.
+- Preserved all remaining structural logic unchanged: column-boundary detection, split-line merging, bare-number/labeled-total subtotal-finding, and the derived total_assets/total_liabilities calculation — none of these are label-wording problems the taxonomy is meant to solve.
+- Verified all figures across both companies and all five combined years (2 for Tesco, 3 for Sainsbury's) remain exactly identical to previously stored, hand-verified data — zero regression.
+- Confirmed duplicate-safety against the live database.
+**Current Status**
+Income statement and balance sheet are both migrated to the shared IFRS concept architecture. Cash flow parser remains on its original, still-correct, hardcoded keyword approach.
+**Next Steps**
+- Migrate `cash_flow_parser.py` to the IFRS taxonomy.
+- Once all three are migrated, review whether any now-unused legacy code (e.g. redundant keyword lists) can be safely removed.
