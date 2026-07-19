@@ -1,15 +1,10 @@
 /* ==========================================================================
    Investment Research Assistant v1.0 — Application Logic
-   Plain ES6, no framework. Handles SPA navigation and FastAPI integration.
    ========================================================================== */
 
 const API_BASE_URL = "/api";
-
 let activeCompanyId = null;
-
-/* ---------------------------------------------------------------------
-   NAVIGATION
-   --------------------------------------------------------------------- */
+let currentDocumentCompanyId = null; // tracks which company's PDF is currently loaded
 
 function showPage(pageId) {
     document.querySelectorAll(".page").forEach(page => {
@@ -37,10 +32,6 @@ function initNavigation() {
     });
 }
 
-/* ---------------------------------------------------------------------
-   REAL FASTAPI FETCH FUNCTIONS
-   --------------------------------------------------------------------- */
-
 async function apiGet(path) {
     try {
         const response = await fetch(`${API_BASE_URL}${path}`);
@@ -67,57 +58,20 @@ async function apiPost(path, body) {
     }
 }
 
-function fetchCompanies() {
-    return apiGet("/companies");
-}
-
-function fetchCompany(companyId) {
-    return apiGet(`/companies/${companyId}`);
-}
-
-function fetchIncomeStatement(companyId) {
-    return apiGet(`/companies/${companyId}/income-statement`);
-}
-
-function fetchBalanceSheet(companyId) {
-    return apiGet(`/companies/${companyId}/balance-sheet`);
-}
-
-function fetchCashFlow(companyId) {
-    return apiGet(`/companies/${companyId}/cash-flow`);
-}
-
-function fetchRatios(companyId) {
-    return apiGet(`/companies/${companyId}/ratios`);
-}
-
-function fetchVerification(companyId) {
-    return apiGet(`/companies/${companyId}/verification`);
-}
-
+function fetchCompanies() { return apiGet("/companies"); }
+function fetchCompany(companyId) { return apiGet(`/companies/${companyId}`); }
+function fetchIncomeStatement(companyId) { return apiGet(`/companies/${companyId}/income-statement`); }
+function fetchBalanceSheet(companyId) { return apiGet(`/companies/${companyId}/balance-sheet`); }
+function fetchCashFlow(companyId) { return apiGet(`/companies/${companyId}/cash-flow`); }
+function fetchRatios(companyId) { return apiGet(`/companies/${companyId}/ratios`); }
+function fetchVerification(companyId) { return apiGet(`/companies/${companyId}/verification`); }
 function submitVerificationCorrection(figureId, correctedValue) {
     return apiPost(`/figures/${figureId}/correct`, { corrected_value: correctedValue });
 }
-
-function approveFigure(figureId) {
-    return apiPost(`/figures/${figureId}/verify`, {});
-}
-
-function fetchComparison(companyIds) {
-    return apiGet(`/compare?ids=${companyIds.join(",")}`);
-}
-
-function fetchReports() {
-    return apiGet("/reports");
-}
-
-function generateReport(companyId) {
-    return apiPost("/reports/generate", { company_id: companyId });
-}
-
-/* ---------------------------------------------------------------------
-   PAGE LOAD FUNCTIONS
-   --------------------------------------------------------------------- */
+function approveFigure(figureId) { return apiPost(`/figures/${figureId}/verify`, {}); }
+function fetchComparison(companyIds) { return apiGet(`/compare?ids=${companyIds.join(",")}`); }
+function fetchReports() { return apiGet("/reports"); }
+function generateReport(companyId) { return apiPost("/reports/generate", { company_id: companyId }); }
 
 async function loadDashboard() {
     console.log("loadDashboard()");
@@ -141,18 +95,25 @@ function renderCompaniesTable(companies) {
             <td>${company.industry ?? "—"}</td>
             <td>${company.country ?? "—"}</td>
             <td>${company.verified ? "Verified" : "Unverified"}</td>
-            <td><button class="btn btn-secondary" onclick="setActiveCompany(${company.id}, '${company.name}')">Select</button></td>
+            <td><button class="btn btn-secondary" onclick="setActiveCompany(${company.id}, '${company.name}', true)">Select</button></td>
         </tr>
     `).join("");
 }
 
-function setActiveCompany(companyId, companyName) {
+function setActiveCompany(companyId, companyName, navigateToVerification = false) {
     activeCompanyId = companyId;
     document.getElementById("active-company-name").textContent = companyName;
+    if (navigateToVerification) {
+        showPage("verification");
+        const select = document.getElementById("verification-company-select");
+        // Ensure the dropdown reflects the newly selected company once populated
+        setTimeout(() => { select.value = companyId; }, 0);
+    }
 }
 
+// Loads BOTH the figures table and the document viewer — call this only
+// when the active company has actually changed.
 async function loadVerification() {
-    // Populate the company dropdown if it's empty
     const select = document.getElementById("verification-company-select");
     if (select.options.length <= 1) {
         const companies = await fetchCompanies();
@@ -172,17 +133,28 @@ async function loadVerification() {
 
     if (!activeCompanyId) return;
 
+    await refreshVerificationTable();
+
+    // Only reload the PDF viewer if the company has actually changed —
+    // reloading it on every edit/approve was resetting scroll position.
+    if (currentDocumentCompanyId !== activeCompanyId) {
+        const docInfo = await apiGet(`/companies/${activeCompanyId}/document`);
+        const viewer = document.getElementById("verification-document-viewer");
+        if (docInfo && docInfo.file_path) {
+            const filename = docInfo.file_path.split("/").pop();
+            viewer.innerHTML = `<embed src="/documents/${filename}" type="application/pdf" width="100%" height="500px">`;
+        } else {
+            viewer.innerHTML = `<p class="placeholder-row">No source document found for this company</p>`;
+        }
+        currentDocumentCompanyId = activeCompanyId;
+    }
+}
+
+// Refreshes ONLY the figures table — used after an edit/approve action,
+// so the PDF viewer is left completely untouched.
+async function refreshVerificationTable() {
     const figures = await fetchVerification(activeCompanyId);
     renderVerificationTable(figures || []);
-
-    const docInfo = await apiGet(`/companies/${activeCompanyId}/document`);
-    const viewer = document.getElementById("verification-document-viewer");
-    if (docInfo && docInfo.file_path) {
-        const filename = docInfo.file_path.split("/").pop();
-        viewer.innerHTML = `<embed src="/documents/${filename}" type="application/pdf" width="100%" height="500px">`;
-    } else {
-        viewer.innerHTML = `<p class="placeholder-row">No source document found for this company</p>`;
-    }
 }
 
 function renderVerificationTable(figures) {
@@ -202,22 +174,20 @@ function renderVerificationTable(figures) {
             <td>${figure.confidence ?? "—"}</td>
             <td><input type="number" value="${figure.corrected_value ?? ''}" data-id="${figure.id}" class="correction-input" onchange="handleCorrection(${figure.id}, this.value)"></td>
             <td class="${figure.verified ? 'status-verified' : 'status-unverified'}">${figure.verified ? "✓ Verified" : "⚠ Unverified"}</td>
-            <td>
-                <button class="btn btn-primary" onclick="handleApprove(${figure.id})">Accept</button>
-            </td>
+            <td><button class="btn btn-primary" onclick="handleApprove(${figure.id})">Accept</button></td>
         </tr>
     `).join("");
 }
 
 async function handleCorrection(figureId, value) {
-    if (value === "") return;
-    await submitVerificationCorrection(figureId, parseFloat(value));
-    loadVerification();
+    const parsedValue = value === "" ? null : parseFloat(value);
+    await submitVerificationCorrection(figureId, parsedValue);
+    await refreshVerificationTable(); // table only — PDF stays untouched
 }
 
 async function handleApprove(figureId) {
     await approveFigure(figureId);
-    loadVerification();
+    await refreshVerificationTable(); // table only — PDF stays untouched
 }
 
 async function loadAnalysis() {
@@ -283,10 +253,6 @@ function initReportsButton() {
 async function loadSettings() {
     console.log("loadSettings()");
 }
-
-/* ---------------------------------------------------------------------
-   INITIALISATION
-   --------------------------------------------------------------------- */
 
 document.addEventListener("DOMContentLoaded", () => {
     initNavigation();

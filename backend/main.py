@@ -1,7 +1,5 @@
 """
 FastAPI backend for Investment Research Assistant v1.0.
-Serves the frontend (static files) and exposes REST endpoints matching
-the fetch functions already defined in frontend/app.js.
 """
 
 import sys, os
@@ -13,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy.orm import sessionmaker
 
 from database import Company, FinancialFigure, SourceDocument, engine
@@ -26,10 +25,6 @@ def get_session():
     return Session()
 
 
-# --------------------------------------------------------------------
-# Companies
-# --------------------------------------------------------------------
-
 @app.get("/api/companies")
 def list_companies():
     session = get_session()
@@ -41,7 +36,7 @@ def list_companies():
             "company_number": c.company_number,
             "industry": None,
             "country": None,
-            "verified": any(f.verified for f in c.financials) if c.financials else False,
+            "verified": bool(c.financials) and all(f.verified for f in c.financials),
         }
         for c in companies
     ]
@@ -63,15 +58,10 @@ def get_company(company_id: int):
     }
 
 
-# --------------------------------------------------------------------
-# Statements
-# --------------------------------------------------------------------
-
 def _figures_for_statement(session, company_id, statement_type):
     figures = session.query(FinancialFigure).filter_by(
         company_id=company_id, statement_type=statement_type
     ).all()
-
     by_line_item = {}
     for f in figures:
         by_line_item.setdefault(f.line_item, {})[f.fiscal_year_end] = f.effective_value
@@ -101,10 +91,6 @@ def get_ratios(company_id: int):
     return {}
 
 
-# --------------------------------------------------------------------
-# Verification
-# --------------------------------------------------------------------
-
 @app.get("/api/companies/{company_id}/verification")
 def get_verification_data(company_id: int):
     session = get_session()
@@ -127,7 +113,9 @@ def get_verification_data(company_id: int):
 
 
 class CorrectionPayload(BaseModel):
-    corrected_value: float
+    # Optional and nullable: sending null explicitly clears the correction,
+    # returning the figure to its original machine-extracted value.
+    corrected_value: Optional[float] = None
 
 
 @app.post("/api/figures/{figure_id}/correct")
@@ -136,7 +124,7 @@ def correct_figure(figure_id: int, payload: CorrectionPayload):
     figure = session.query(FinancialFigure).filter_by(id=figure_id).first()
     if not figure:
         raise HTTPException(status_code=404, detail="Figure not found")
-    figure.corrected_value = payload.corrected_value
+    figure.corrected_value = payload.corrected_value  # None clears it
     session.commit()
     return {"id": figure.id, "corrected_value": figure.corrected_value}
 
@@ -151,10 +139,6 @@ def verify_figure(figure_id: int):
     session.commit()
     return {"id": figure.id, "verified": figure.verified}
 
-
-# --------------------------------------------------------------------
-# Source documents
-# --------------------------------------------------------------------
 
 @app.get("/api/companies/{company_id}/document")
 def get_company_document(company_id: int):
@@ -173,10 +157,6 @@ def serve_document(filename: str):
     return FileResponse(filepath, media_type="application/pdf")
 
 
-# --------------------------------------------------------------------
-# Compare / Reports — stubs
-# --------------------------------------------------------------------
-
 @app.get("/api/compare")
 def compare_companies(ids: str = ""):
     return {"companies": ids.split(",") if ids else [], "data": {}}
@@ -192,9 +172,10 @@ def generate_report(payload: dict):
     return {"status": "not_yet_implemented"}
 
 
-# --------------------------------------------------------------------
-# Serve the frontend
-# --------------------------------------------------------------------
+@app.get("/favicon.ico")
+def favicon():
+    return {}
+
 
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
