@@ -1,13 +1,10 @@
 /* ==========================================================================
    Investment Research Assistant v1.0 — Application Logic
-   Plain ES6, no framework. Handles SPA navigation and prepares FastAPI
-   integration points (fetch functions + load functions per page).
-   Nothing here talks to a real backend yet — that's the next phase.
+   Plain ES6, no framework. Handles SPA navigation and FastAPI integration.
    ========================================================================== */
 
-const API_BASE_URL = "/api"; // will point to the FastAPI backend once deployed
+const API_BASE_URL = "/api";
 
-// Tracks which company is currently "active" across the whole app
 let activeCompanyId = null;
 
 /* ---------------------------------------------------------------------
@@ -22,7 +19,6 @@ function showPage(pageId) {
         button.classList.toggle("active", button.dataset.page === pageId);
     });
 
-    // Route to the correct load function for the page being shown
     const loaders = {
         dashboard: loadDashboard,
         companies: loadCompanies,
@@ -42,33 +38,36 @@ function initNavigation() {
 }
 
 /* ---------------------------------------------------------------------
-   FASTAPI FETCH FUNCTIONS
-   These are the ONLY places that will eventually talk to the backend.
-   Every one currently returns placeholder data or does nothing, so the
-   UI can be built and tested before the API exists.
+   REAL FASTAPI FETCH FUNCTIONS
    --------------------------------------------------------------------- */
 
 async function apiGet(path) {
-    // Placeholder implementation. Once FastAPI exists, this becomes:
-    // const response = await fetch(`${API_BASE_URL}${path}`);
-    // return response.json();
-    console.log(`[stub] GET ${API_BASE_URL}${path}`);
-    return null;
+    try {
+        const response = await fetch(`${API_BASE_URL}${path}`);
+        if (!response.ok) throw new Error(`GET ${path} failed: ${response.status}`);
+        return await response.json();
+    } catch (err) {
+        console.error(err);
+        return null;
+    }
 }
 
 async function apiPost(path, body) {
-    // Placeholder implementation. Once FastAPI exists, this becomes:
-    // const response = await fetch(`${API_BASE_URL}${path}`, {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify(body),
-    // });
-    // return response.json();
-    console.log(`[stub] POST ${API_BASE_URL}${path}`, body);
-    return null;
+    try {
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(`POST ${path} failed: ${response.status}`);
+        return await response.json();
+    } catch (err) {
+        console.error(err);
+        return null;
+    }
 }
 
-function fetchCompanies(filters = {}) {
+function fetchCompanies() {
     return apiGet("/companies");
 }
 
@@ -118,13 +117,9 @@ function generateReport(companyId) {
 
 /* ---------------------------------------------------------------------
    PAGE LOAD FUNCTIONS
-   Each corresponds to one sidebar section. Currently these just call
-   their fetch function (which logs a stub call) — real DOM population
-   will be filled in once FastAPI returns real data.
    --------------------------------------------------------------------- */
 
 async function loadDashboard() {
-    // Future: fetchCompanies(), fetchVerification(), etc. to populate cards
     console.log("loadDashboard()");
 }
 
@@ -157,9 +152,37 @@ function setActiveCompany(companyId, companyName) {
 }
 
 async function loadVerification() {
+    // Populate the company dropdown if it's empty
+    const select = document.getElementById("verification-company-select");
+    if (select.options.length <= 1) {
+        const companies = await fetchCompanies();
+        (companies || []).forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = c.name;
+            select.appendChild(opt);
+        });
+        select.addEventListener("change", () => {
+            if (select.value) {
+                setActiveCompany(parseInt(select.value), select.options[select.selectedIndex].text);
+                loadVerification();
+            }
+        });
+    }
+
     if (!activeCompanyId) return;
+
     const figures = await fetchVerification(activeCompanyId);
     renderVerificationTable(figures || []);
+
+    const docInfo = await apiGet(`/companies/${activeCompanyId}/document`);
+    const viewer = document.getElementById("verification-document-viewer");
+    if (docInfo && docInfo.file_path) {
+        const filename = docInfo.file_path.split("/").pop();
+        viewer.innerHTML = `<embed src="/documents/${filename}" type="application/pdf" width="100%" height="500px">`;
+    } else {
+        viewer.innerHTML = `<p class="placeholder-row">No source document found for this company</p>`;
+    }
 }
 
 function renderVerificationTable(figures) {
@@ -177,33 +200,28 @@ function renderVerificationTable(figures) {
             <td>${figure.value}</td>
             <td>${figure.ifrs_concept ?? "—"}</td>
             <td>${figure.confidence ?? "—"}</td>
-            <td><input type="number" value="${figure.corrected_value ?? ''}" data-id="${figure.id}" class="correction-input"></td>
+            <td><input type="number" value="${figure.corrected_value ?? ''}" data-id="${figure.id}" class="correction-input" onchange="handleCorrection(${figure.id}, this.value)"></td>
             <td class="${figure.verified ? 'status-verified' : 'status-unverified'}">${figure.verified ? "✓ Verified" : "⚠ Unverified"}</td>
             <td>
-                <button class="btn btn-primary" onclick="approveFigure(${figure.id})">Accept</button>
-                <button class="btn btn-secondary" onclick="editFigure(${figure.id})">Edit</button>
-                <button class="btn btn-danger" onclick="rejectFigure(${figure.id})">Reject</button>
+                <button class="btn btn-primary" onclick="handleApprove(${figure.id})">Accept</button>
             </td>
         </tr>
     `).join("");
 }
 
-function editFigure(figureId) {
-    console.log(`[stub] Edit figure ${figureId}`);
+async function handleCorrection(figureId, value) {
+    if (value === "") return;
+    await submitVerificationCorrection(figureId, parseFloat(value));
+    loadVerification();
 }
 
-function rejectFigure(figureId) {
-    console.log(`[stub] Reject figure ${figureId}`);
+async function handleApprove(figureId) {
+    await approveFigure(figureId);
+    loadVerification();
 }
 
 async function loadAnalysis() {
     if (!activeCompanyId) return;
-    // Future: await Promise.all([
-    //     fetchIncomeStatement(activeCompanyId),
-    //     fetchBalanceSheet(activeCompanyId),
-    //     fetchCashFlow(activeCompanyId),
-    //     fetchRatios(activeCompanyId),
-    // ]) and populate each accordion section.
     console.log("loadAnalysis()", activeCompanyId);
 }
 
@@ -275,5 +293,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initAccordion();
     initCompareButton();
     initReportsButton();
-    loadDashboard(); // dashboard is the default active page
+    loadDashboard();
 });
