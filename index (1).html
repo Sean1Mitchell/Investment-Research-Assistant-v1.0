@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Research Assistant v1.0</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+
+        <!-- ============ SIDEBAR (never changes) ============ -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">Investment<br>Research Assistant</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-page="dashboard">Dashboard</button>
+                <button class="nav-item" data-page="companies">Companies</button>
+                <button class="nav-item" data-page="verification">Verification</button>
+                <button class="nav-item" data-page="analysis">Analysis</button>
+                <button class="nav-item" data-page="compare">Compare</button>
+                <button class="nav-item" data-page="reports">Reports</button>
+                <button class="nav-item" data-page="settings">Settings</button>
+            </nav>
+            <div class="sidebar-footer">
+                <span class="active-company-label">Active company: <strong id="active-company-name">None selected</strong></span>
+            </div>
+        </aside>
+
+        <!-- ============ MAIN CONTENT ============ -->
+        <main class="main-content">
+
+            <!-- ---------- DASHBOARD ---------- -->
+            <section id="dashboard" class="page active">
+                <header class="page-header">
+                    <h2>Dashboard</h2>
+                    <p class="page-subtitle">Overview of your research activity</p>
+                </header>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>Recently Analysed Companies</h3>
+                        <ul class="card-list" id="dashboard-recent-companies">
+                            <li class="placeholder-row">No data yet</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Recently Imported Reports</h3>
+                        <ul class="card-list" id="dashboard-recent-reports">
+                            <li class="placeholder-row">No data yet</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Pending Verification</h3>
+                        <ul class="card-list" id="dashboard-pending-verification">
+                            <li class="placeholder-row">No data yet</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Favourite Companies</h3>
+                        <ul class="card-list" id="dashboard-favourites">
+                            <li class="placeholder-row">No data yet</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Recent Comparisons</h3>
+                        <ul class="card-list" id="dashboard-recent-comparisons">
+                            <li class="placeholder-row">No data yet</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Research Statistics</h3>
+                        <div class="stats-grid" id="dashboard-stats">
+                            <div class="stat"><span class="stat-value">--</span><span class="stat-label">Companies Tracked</span></div>
+                            <div class="stat"><span class="stat-value">--</span><span class="stat-label">Reports Imported</span></div>
+                            <div class="stat"><span class="stat-value">--</span><span class="stat-label">Figures Verified</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ---------- COMPANIES ---------- -->
+            <section id="companies" class="page">
+                <header class="page-header">
+                    <h2>Companies</h2>
+                    <p class="page-subtitle">Search, filter, and select a company to work with</p>
+                </header>
+
+                <div class="toolbar">
+                    <input type="text" id="company-search-input" placeholder="Search companies...">
+                    <select id="filter-industry">
+                        <option value="">All Industries</option>
+                    </select>
+                    <select id="filter-country">
+                        <option value="">All Countries</option>
+                    </select>
+                    <select id="filter-verified">
+                        <option value="">All Statuses</option>
+                        <option value="verified">Verified</option>
+                        <option value="unverified">Unverified</option>
+                    </select>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="data-table" id="companies-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Company Number</th>
+                                <th>Industry</th>
+                                <th>Country</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companies-table-body">
+                            <tr><td colspan="6" class="placeholder-row">No companies loaded yet</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h3>Recently Viewed</h3>
+                    <ul class="card-list" id="companies-recently-viewed">
+                        <li class="placeholder-row">No data yet</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ---------- VERIFICATION ---------- -->
+            <section id="verification" class="page">
+                <header class="page-header">
+                    <h2>Verification</h2>
+                    <p class="page-subtitle">Review extracted data against the original source document</p>
+                </header>
+
+                <div class="toolbar">
+                    <select id="verification-company-select">
+                        <option value="">Select a company...</option>
+                    </select>
+                    <select id="verification-statement-filter">
+                        <option value="">All Statements</option>
+                        <option value="income_statement">Income Statement</option>
+                        <option value="balance_sheet">Balance Sheet</option>
+                        <option value="cash_flow">Cash Flow</option>
+                    </select>
+                </div>
+
+                <div class="verification-layout">
+                    <div class="document-panel card">
+                        <h3>Source Document</h3>
+                        <div class="document-viewer-placeholder" id="verification-document-viewer">
+                            <p class="placeholder-row">Select a company to load its source document</p>
+                        </div>
+                    </div>
+
+                    <div class="figures-panel card">
+                        <h3>Extracted Figures</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table" id="verification-table">
+                                <thead>
+                                    <tr>
+                                        <th>Statement</th>
+                                        <th>Line Item</th>
+                                        <th>Year</th>
+                                        <th>Extracted Value</th>
+                                        <th>Corrected Value</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="verification-table-body">
+                                    <tr><td colspan="7" class="placeholder-row">No figures loaded yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-secondary" id="add-missing-item-btn">+ Add Missing Line Item</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ---------- ANALYSIS ---------- -->
+            <section id="analysis" class="page">
+                <header class="page-header">
+                    <h2>Analysis</h2>
+                    <p class="page-subtitle">Company financial analysis</p>
+                </header>
+
+                <div class="accordion" id="analysis-accordion">
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-overview">Overview</button>
+                        <div class="accordion-body" id="analysis-overview">
+                            <p class="placeholder-row">Overview data will appear here once a company is selected.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-income-statement">Income Statement</button>
+                        <div class="accordion-body" id="analysis-income-statement">
+                            <table class="data-table">
+                                <thead><tr><th>Line Item</th><th colspan="3">Year (placeholder)</th></tr></thead>
+                                <tbody><tr><td colspan="4" class="placeholder-row">Awaiting data from FastAPI</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-balance-sheet">Balance Sheet</button>
+                        <div class="accordion-body" id="analysis-balance-sheet">
+                            <table class="data-table">
+                                <thead><tr><th>Line Item</th><th colspan="3">Year (placeholder)</th></tr></thead>
+                                <tbody><tr><td colspan="4" class="placeholder-row">Awaiting data from FastAPI</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-cash-flow">Cash Flow Statement</button>
+                        <div class="accordion-body" id="analysis-cash-flow">
+                            <table class="data-table">
+                                <thead><tr><th>Line Item</th><th colspan="3">Year (placeholder)</th></tr></thead>
+                                <tbody><tr><td colspan="4" class="placeholder-row">Awaiting data from FastAPI</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-ratios">Ratios</button>
+                        <div class="accordion-body" id="analysis-ratios">
+                            <p class="placeholder-row">Ratio analysis will appear here.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-valuation">Valuation</button>
+                        <div class="accordion-body" id="analysis-valuation">
+                            <p class="placeholder-row">Valuation analysis will appear here.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header" data-target="analysis-notes">Notes</button>
+                        <div class="accordion-body" id="analysis-notes">
+                            <p class="placeholder-row">Analyst notes will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ---------- COMPARE ---------- -->
+            <section id="compare" class="page">
+                <header class="page-header">
+                    <h2>Compare</h2>
+                    <p class="page-subtitle">Select 2–10 companies to compare side by side</p>
+                </header>
+
+                <div class="toolbar">
+                    <select id="compare-company-picker" multiple size="5">
+                        <option disabled>Companies will be listed here</option>
+                    </select>
+                    <button class="btn btn-primary" id="run-comparison-btn">Compare Selected</button>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>Side-by-Side Financial Statements</h3>
+                        <p class="placeholder-row">Comparison table will appear here</p>
+                    </div>
+                    <div class="card">
+                        <h3>Ratio Comparison</h3>
+                        <p class="placeholder-row">Ratio comparison will appear here</p>
+                    </div>
+                    <div class="card">
+                        <h3>Growth Comparison</h3>
+                        <p class="placeholder-row">Growth comparison will appear here</p>
+                    </div>
+                    <div class="card">
+                        <h3>Valuation Comparison</h3>
+                        <p class="placeholder-row">Valuation comparison will appear here</p>
+                    </div>
+                    <div class="card">
+                        <h3>Charts</h3>
+                        <p class="placeholder-row">Charts will appear here</p>
+                    </div>
+                    <div class="card">
+                        <h3>Rankings</h3>
+                        <p class="placeholder-row">Rankings will appear here</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ---------- REPORTS ---------- -->
+            <section id="reports" class="page">
+                <header class="page-header">
+                    <h2>Reports</h2>
+                    <p class="page-subtitle">Generate investment reports</p>
+                </header>
+
+                <div class="toolbar">
+                    <select id="reports-company-select">
+                        <option value="">Select a company...</option>
+                    </select>
+                    <button class="btn btn-primary" id="generate-report-btn">Generate Report</button>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card"><h3>Financial Summary</h3><p class="placeholder-row">Not yet generated</p></div>
+                    <div class="card"><h3>Ratio Analysis</h3><p class="placeholder-row">Not yet generated</p></div>
+                    <div class="card"><h3>Investment Thesis</h3><p class="placeholder-row">Not yet generated</p></div>
+                    <div class="card"><h3>Strengths</h3><p class="placeholder-row">Not yet generated</p></div>
+                    <div class="card"><h3>Weaknesses</h3><p class="placeholder-row">Not yet generated</p></div>
+                    <div class="card"><h3>Valuation</h3><p class="placeholder-row">Not yet generated</p></div>
+                    <div class="card"><h3>Recommendation</h3><p class="placeholder-row">Not yet generated</p></div>
+                </div>
+
+                <div class="card">
+                    <h3>Report History</h3>
+                    <ul class="card-list" id="reports-history-list">
+                        <li class="placeholder-row">No reports generated yet</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ---------- SETTINGS ---------- -->
+            <section id="settings" class="page">
+                <header class="page-header">
+                    <h2>Settings</h2>
+                    <p class="page-subtitle">Manage your account and preferences</p>
+                </header>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>Profile</h3>
+                        <label>Username <input type="text" id="settings-username" placeholder="Username"></label>
+                        <label>Email <input type="email" id="settings-email" placeholder="Email"></label>
+                        <label>Password <input type="password" id="settings-password" placeholder="New password"></label>
+                        <button class="btn btn-primary" id="settings-save-profile-btn">Save Profile</button>
+                    </div>
+                    <div class="card">
+                        <h3>Theme</h3>
+                        <label><input type="radio" name="theme" value="light" checked> Light</label>
+                        <label><input type="radio" name="theme" value="dark"> Dark</label>
+                    </div>
+                    <div class="card">
+                        <h3>Notifications</h3>
+                        <label><input type="checkbox" id="notify-new-filings"> Notify on new filings</label>
+                        <label><input type="checkbox" id="notify-verification-due"> Notify when verification is due</label>
+                    </div>
+                    <div class="card">
+                        <h3>API Keys</h3>
+                        <label>Companies House API Key <input type="password" id="settings-ch-api-key" placeholder="••••••••"></label>
+                        <button class="btn btn-secondary" id="settings-save-keys-btn">Save Keys</button>
+                    </div>
+                    <div class="card card-danger">
+                        <h3>Delete Account</h3>
+                        <p>This action is permanent and cannot be undone.</p>
+                        <button class="btn btn-danger" id="settings-delete-account-btn">Delete Account</button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
